@@ -4,5 +4,8 @@
 
 #ifndef BASIC_HTTP_CLIENT_HTTP_CLIENT_H
 #define BASIC_HTTP_CLIENT_HTTP_CLIENT_H
-void send_request();
+namespace basic_http_client
+{
+    void send_http_request();
+}
 #endif //BASIC_HTTP_CLIENT_HTTP_CLIENT_H
