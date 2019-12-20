@@ -24,15 +24,14 @@ namespace basic_http_client {
 
     public:
         std::string server_url;
-        int service_port_nb;
-        int ip;
+        struct sockaddr_in* server_addr;
 
         int sock_fd;
         struct pollfd *poll_fd = nullptr;
         uint8_t *response_buffer;
         int buffer_size;
-
-        void send_http_request();
+        void set_server(const char*);
+        void send_http_request(const char*);
     };
 
 }

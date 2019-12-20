@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fcntl.h>
 #include <cstring>
+#include <netdb.h>
 #include "HttpClient.h"
 
 
@@ -37,11 +38,7 @@ namespace basic_http_client {
     int HttpClient::connect_server() {
         if (this->sock_fd <= 0) return -1;
 
-        struct sockaddr_in server_addr = {0};
-        server_addr.sin_addr.s_addr = inet_addr(API_IP);
-        server_addr.sin_port = htons(HTTP_PORT);
-        server_addr.sin_family = AF_INET;
-        return connect(this->sock_fd, (struct sockaddr *) &server_addr, sizeof server_addr);
+        return connect(this->sock_fd, (struct sockaddr *) this->server_addr, sizeof *server_addr);
     }
 
 /**
@@ -132,7 +129,9 @@ namespace basic_http_client {
         return buff;
     }
 
-    void HttpClient::send_http_request() {
+    void HttpClient::send_http_request(const char* domain) {
+
+        set_server(domain);
         //create socket
         int sock_fd = create_client_socket();
         //connect to server
@@ -158,6 +157,22 @@ namespace basic_http_client {
         json_body = strchr((char *) buff, '{');
 
         std::cout << json_body;
+    }
+
+    void HttpClient::set_server(const char* domain_name)
+    {
+       // std::getline(std::cin,this->server_url);
+
+        struct addrinfo *res;
+        getaddrinfo(domain_name,NULL,NULL, &res);
+        //copy the 4byte ip addr.
+        struct sockaddr_in* tmp = (struct sockaddr_in*) res->ai_addr;
+        this->server_addr->sin_addr.s_addr = tmp->sin_addr.s_addr;
+        this->server_addr->sin_port = htons(HTTP_PORT);
+        this->server_addr->sin_family = AF_INET;
+
+        freeaddrinfo(res);
+
     }
 
 }
