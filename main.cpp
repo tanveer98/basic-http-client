@@ -13,11 +13,12 @@ int main(int argc, char* argv[]) {
     std::cout << "Hello, World!" << std::endl;
     auto* req = new basic_http_client::HttpClient;
     struct pollfd _poll = {0};
-    //req->poll_fd = &_poll;
+    req->poll_fd = &_poll;
     struct  sockaddr_in s_addr;
     req->server_addr = &s_addr;
     try{
         req->send_http_request(argv[1]);
+        basic_http_client::show_ip(argv[1]);
     }
     catch(const char* e)
     {

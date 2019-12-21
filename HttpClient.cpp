@@ -7,6 +7,7 @@
 #include <cstring>
 #include <netdb.h>
 #include "HttpClient.h"
+#include "basic_http_client.h"
 
 
 #define HTTP_PORT 80
@@ -129,7 +130,20 @@ namespace basic_http_client {
         return buff;
     }
 
-    void HttpClient::send_http_request(const char* domain) {
+    void HttpClient::set_server(const char *domain_name) {
+        // std::getline(std::cin,this->server_url);
+
+        struct addrinfo *res = resolve_ip(domain_name);
+        //copy the 4byte ip addr.
+        struct sockaddr_in *tmp = (struct sockaddr_in *) res->ai_addr;
+        this->server_addr->sin_addr.s_addr = tmp->sin_addr.s_addr;
+        this->server_addr->sin_port = htons(HTTP_PORT);
+        this->server_addr->sin_family = AF_INET;
+        freeaddrinfo(res);
+    }
+
+
+    void HttpClient::send_http_request(const char *domain) {
 
         set_server(domain);
         //create socket
@@ -156,23 +170,29 @@ namespace basic_http_client {
         char *json_body = strstr((char *) buff, "\r\n\r\n");
         json_body = strchr((char *) buff, '{');
 
-        std::cout << json_body;
-    }
-
-    void HttpClient::set_server(const char* domain_name)
-    {
-       // std::getline(std::cin,this->server_url);
-
-        struct addrinfo *res;
-        getaddrinfo(domain_name,NULL,NULL, &res);
-        //copy the 4byte ip addr.
-        struct sockaddr_in* tmp = (struct sockaddr_in*) res->ai_addr;
-        this->server_addr->sin_addr.s_addr = tmp->sin_addr.s_addr;
-        this->server_addr->sin_port = htons(HTTP_PORT);
-        this->server_addr->sin_family = AF_INET;
-
-        freeaddrinfo(res);
+        std::cout << json_body << std::endl;
 
     }
 
 }
+
+
+struct addrinfo *basic_http_client::resolve_ip(const char *domain_name) {
+    struct addrinfo *res;
+    getaddrinfo(domain_name, NULL, NULL, &res);
+    return res;
+}
+
+void basic_http_client::show_ip(const char* domain_name) {
+    const struct addrinfo *orig = resolve_ip(domain_name);
+    struct addrinfo* tmp = const_cast<addrinfo *>(orig);
+
+    while (tmp != nullptr) {
+        struct sockaddr_in *addr = (struct sockaddr_in*)tmp->ai_addr;
+        struct in_addr ip = addr->sin_addr;
+        std::cout << inet_ntoa(ip) << " and AI_PROTOCOL " << tmp->ai_protocol << " AND socket type " << tmp->ai_socktype << std::endl;
+        tmp = tmp->ai_next;
+    }
+}
+
+

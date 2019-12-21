@@ -32,6 +32,7 @@ namespace basic_http_client {
         int buffer_size;
         void set_server(const char*);
         void send_http_request(const char*);
+
     };
 
 }
