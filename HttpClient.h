@@ -21,7 +21,7 @@ namespace basic_http_client {
         int connect_server();
         int send_request();
         int async_socket();
-        int create_tls();
+        int create_ssl();
 
         uint8_t *recv_response();
         std::chrono::steady_clock::time_point begin;
@@ -36,7 +36,7 @@ namespace basic_http_client {
         struct pollfd *poll_fd = nullptr;
         uint8_t *response_buffer;
         int buffer_size;
-
+        int create_tls();
         void set_server(const char*);
         void send_http_request();
 

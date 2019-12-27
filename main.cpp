@@ -31,13 +31,12 @@ int main(int argc, char *argv[]) {
     std::string request;
     int req_body_len = 0;
 
-
     request_body = "{\"jsonrpc\":\"2.0\",\"method\":\"generateIntegers\",\"params\":{\"apiKey\":\"eb47436d-c9b3-4e12-bbcf-3de58d660dbc\",\"n\":1,\"min\":1,\"max\":10,\"replacement\":true,\"base\":10},\"id\":9840}";
     req_body_len = request_body.size();
     //POST request must contain a content-length (size of the payload)
     request_header = boost::format(
-            "POST /json-rpc/2/invoke HTTP/1.1\r\nHost: api.random.org\r\nAccept: */*\r\nUser-Agent: Mozilla/4.0 (compatible; MSIE5.01; Windows NT)\r\nContent-Length: %d\r\nAccept-Encoding: deflate\r\nConnection: Keep-Alive\r\nContent-Type: application/json\r\n\r\n%s") %
-                                   req_body_len % request_body;
+            "POST /json-rpc/2/invoke HTTP/1.1\r\nHost: %s\r\nAccept: */*\r\nUser-Agent: Mozilla/4.0 (compatible; MSIE5.01; Windows NT)\r\nContent-Length: %d\r\nAccept-Encoding: deflate\r\nConnection: Keep-Alive\r\nContent-Type: application/json\r\n\r\n%s") %
+                                  argv[1] % req_body_len % request_body;
 
     request = request_header.str();
     std::cout << "\t*******request: " << request << " and size : " << request_body.size() << " ********" << std::endl;

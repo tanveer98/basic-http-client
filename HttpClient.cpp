@@ -10,6 +10,8 @@
 #include "basic_http_client.h"
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <tls.h>
+
 #define HTTP_PORT 80
 #define  API_IP "37.139.1.159"
 
@@ -158,7 +160,7 @@ namespace basic_http_client {
         freeaddrinfo(res);
     }
 
-    int HttpClient::create_tls() {
+    int HttpClient::create_ssl() {
 
         int ssl_sock = 0;
         int res = 0;
@@ -176,14 +178,14 @@ namespace basic_http_client {
         ssl = SSL_new(ctx);
 
         ssl_sock = SSL_get_fd(ssl);
-        SSL_set_fd(ssl,this->sock_fd);
+        SSL_set_fd(ssl, this->sock_fd);
         res = SSL_connect(ssl);
-        if( res <= 0) {
+        if (res <= 0) {
             std::cout << "Connect failed!";
             unsigned int err;
-            while(err = ERR_get_error() ) {
-                char* err_str = ERR_error_string(err,0);
-                if(err_str != nullptr) {
+            while (err = ERR_get_error()) {
+                char *err_str = ERR_error_string(err, 0);
+                if (err_str != nullptr) {
                     puts(err_str);
                 }
             }
@@ -196,7 +198,7 @@ namespace basic_http_client {
         while (sent_bytes < to_be_sent) {
             to_be_sent -= sent_bytes;
 
-            sent_bytes += SSL_write(ssl, header , to_be_sent);
+            sent_bytes += SSL_write(ssl, header, to_be_sent);
         }
         std::cout << "Sent bytes: " << sent_bytes << std::endl;
         this->begin = std::chrono::steady_clock::now();
@@ -204,14 +206,14 @@ namespace basic_http_client {
 
         //recv
         int recv_bytes = 0;
-        uint8_t * buff = this->response_buffer;
-        memset(buff,0, this->buffer_size);
+        uint8_t *buff = this->response_buffer;
+        memset(buff, 0, this->buffer_size);
         int buff_size = this->buffer_size;
         int total = 0;
 
         //while(true) {
-            recv_bytes = SSL_read(ssl, buff, BUFSIZ);
-            //if(recv_bytes <= 0) { break; }
+        recv_bytes = SSL_read(ssl, buff, BUFSIZ);
+        //if(recv_bytes <= 0) { break; }
 
 //            total += recv_bytes;
 //            //increment buffsize  by 1024bytes(BUFSIZ) when its almost full
@@ -220,13 +222,58 @@ namespace basic_http_client {
 //                buff = (uint8_t *) realloc(buff, buff_size);p
 //            }
         //}
-        std::cout << (char*) buff << std::endl;
+        std::cout << (char *) buff << std::endl;
         //recv end
 
 
         return ssl_sock;
     }
 
+
+    int HttpClient::create_tls() {
+        tls_init();
+        struct tls *ctx = nullptr;
+        tls_config *cfg = nullptr;
+        int res;
+
+
+        ctx = tls_client();
+        cfg = tls_config_new();
+        res = tls_config_set_ca_path(cfg, "/etc/ssl/certs/");
+        res = tls_configure(ctx, cfg);
+        tls_config_verify(cfg);
+        res = tls_connect_socket(ctx, this->sock_fd, "api.random.org");
+        if (res < 0) {
+            std::cout << "\n\n\n\nCreate tls failed, exiting" << std::endl;
+            exit(102);
+        } else {
+            //send
+            const char *header = this->request_header.c_str();
+            int to_be_sent = request_header.size();
+            int sent_bytes = 0;
+            std::cout << "The request header is :\n " << this->request_header << std::endl;
+            while (sent_bytes < to_be_sent) {
+                to_be_sent -= sent_bytes;
+
+                sent_bytes += tls_write(ctx, header, to_be_sent);
+            }
+            std::cout << "Sent bytes: " << sent_bytes << std::endl;
+
+            //recv
+            int recv_bytes = 0;
+            uint8_t *buff = this->response_buffer;
+            memset(buff, 0, this->buffer_size);
+            int buff_size = this->buffer_size;
+            int total = 0;
+
+
+            recv_bytes = tls_read(ctx, buff, BUFSIZ);
+            std::cout << (char*) buff << std::endl;
+
+            if(recv_bytes) { exit(101);}
+        }
+        return 0;
+    }
 
     void HttpClient::send_http_request() {
 
@@ -249,8 +296,8 @@ namespace basic_http_client {
             buff = (uint8_t *) realloc(nullptr, buff_size);
             this->buffer_size = BUFSIZ;
             this->response_buffer = buff;
-
             create_tls();
+            create_ssl();
         } else {
 
             //Send request
@@ -273,6 +320,7 @@ namespace basic_http_client {
         std::cout << json_body << std::endl;
 
     }
+
 
 }
 
