@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <poll.h>
+#include <chrono>
 
 #include <string>
 
@@ -20,18 +21,25 @@ namespace basic_http_client {
         int connect_server();
         int send_request();
         int async_socket();
+        int create_tls();
+
         uint8_t *recv_response();
+        std::chrono::steady_clock::time_point begin;
+        std::chrono::steady_clock::time_point end;
 
     public:
         std::string server_url;
         struct sockaddr_in* server_addr;
-
+        int port;
+        std::string request_header;
         int sock_fd;
         struct pollfd *poll_fd = nullptr;
         uint8_t *response_buffer;
         int buffer_size;
+
         void set_server(const char*);
-        void send_http_request(const char*);
+        void send_http_request();
+
 
     };
 

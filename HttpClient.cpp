@@ -8,8 +8,8 @@
 #include <netdb.h>
 #include "HttpClient.h"
 #include "basic_http_client.h"
-
-
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 #define HTTP_PORT 80
 #define  API_IP "37.139.1.159"
 
@@ -38,7 +38,6 @@ namespace basic_http_client {
 
     int HttpClient::connect_server() {
         if (this->sock_fd <= 0) return -1;
-
         return connect(this->sock_fd, (struct sockaddr *) this->server_addr, sizeof *server_addr);
     }
 
@@ -49,8 +48,8 @@ namespace basic_http_client {
  */
 
     int HttpClient::send_request() {
-        std::string request_header = "GET /data/2.5/weather?q=Tallinn&appid=940e55b3552b342bfa536b74c819a4cc HTTP/1.1\r\nHost: api.openweathermap.org\r\nUser-Agent: Mozilla/4.0 (compatible; MSIE5.01; Windows NT)\r\nAccept-Encoding: gzip, deflate\r\nConnection: close\r\n\r\n";
-        const char *header = request_header.c_str();
+
+        const char *header = this->request_header.c_str();
         int to_be_sent = request_header.size();
         int sent_bytes = 0;
 
@@ -59,7 +58,7 @@ namespace basic_http_client {
             sent_bytes += send(this->sock_fd, header + sent_bytes, to_be_sent, 0);
         }
         std::cout << "Sent bytes: " << sent_bytes << std::endl;
-
+        this->begin = std::chrono::steady_clock::now();
         return sent_bytes;
     }
 
@@ -101,13 +100,30 @@ namespace basic_http_client {
             int recv_bytes = 0;
             if ((poll_fd != nullptr)) {
                 //non-blocking
-                if (poll_fd->revents && POLLIN) {
+                int res = poll(poll_fd, 1, 0);
+                std::cout << res << std::endl;
+                if ((res > 0)) {
                     recv_bytes = recv(sock_fd, buff + total, BUFSIZ, 0);
+                    this->end = std::chrono::steady_clock::now();
+                    std::cout << "Time difference = "
+                              << std::chrono::duration_cast<std::chrono::milliseconds>(this->end - this->begin).count()
+                              << "[µs]" << std::endl;
                     if (recv_bytes <= 0) { break; }
+                } else {
+                    std::cout << "No data yet, i could be doing something else here.... like counting from 1-10,000"
+                              << std::endl;
+
+                    for (int i = 0; i < 10000; i++) {
+                        std::cout << i << std::endl;
+                    }
                 }
             } else {
                 //blocking
                 recv_bytes = recv(sock_fd, buff + total, BUFSIZ, 0);
+                this->end = std::chrono::steady_clock::now();
+                std::cout << "Time difference = "
+                          << std::chrono::duration_cast<std::chrono::milliseconds>(this->end - this->begin).count()
+                          << "[µs]" << std::endl;
                 if (recv_bytes <= 0) { break; }
             }
 
@@ -137,39 +153,123 @@ namespace basic_http_client {
         //copy the 4byte ip addr.
         struct sockaddr_in *tmp = (struct sockaddr_in *) res->ai_addr;
         this->server_addr->sin_addr.s_addr = tmp->sin_addr.s_addr;
-        this->server_addr->sin_port = htons(HTTP_PORT);
+        this->server_addr->sin_port = htons(this->port);
         this->server_addr->sin_family = AF_INET;
         freeaddrinfo(res);
     }
 
+    int HttpClient::create_tls() {
 
-    void HttpClient::send_http_request(const char *domain) {
+        int ssl_sock = 0;
+        int res = 0;
+        const SSL_METHOD *method = nullptr;
+        SSL_CTX *ctx = nullptr;
+        SSL *ssl = nullptr;
 
-        set_server(domain);
+
+        SSL_library_init();
+        SSLeay_add_ssl_algorithms();
+        SSL_load_error_strings();
+
+        method = TLSv1_2_client_method();
+        ctx = SSL_CTX_new(method);
+        ssl = SSL_new(ctx);
+
+        ssl_sock = SSL_get_fd(ssl);
+        SSL_set_fd(ssl,this->sock_fd);
+        res = SSL_connect(ssl);
+        if( res <= 0) {
+            std::cout << "Connect failed!";
+            unsigned int err;
+            while(err = ERR_get_error() ) {
+                char* err_str = ERR_error_string(err,0);
+                if(err_str != nullptr) {
+                    puts(err_str);
+                }
+            }
+        }
+        //send
+        const char *header = this->request_header.c_str();
+        int to_be_sent = request_header.size();
+        int sent_bytes = 0;
+        std::cout << "The request header is :\n " << this->request_header << std::endl;
+        while (sent_bytes < to_be_sent) {
+            to_be_sent -= sent_bytes;
+
+            sent_bytes += SSL_write(ssl, header , to_be_sent);
+        }
+        std::cout << "Sent bytes: " << sent_bytes << std::endl;
+        this->begin = std::chrono::steady_clock::now();
+        //send end;
+
+        //recv
+        int recv_bytes = 0;
+        uint8_t * buff = this->response_buffer;
+        memset(buff,0, this->buffer_size);
+        int buff_size = this->buffer_size;
+        int total = 0;
+
+        //while(true) {
+            recv_bytes = SSL_read(ssl, buff, BUFSIZ);
+            //if(recv_bytes <= 0) { break; }
+
+//            total += recv_bytes;
+//            //increment buffsize  by 1024bytes(BUFSIZ) when its almost full
+//            if (total > (buff_size - 50)) {
+//                buff_size += BUFSIZ;
+//                buff = (uint8_t *) realloc(buff, buff_size);p
+//            }
+        //}
+        std::cout << (char*) buff << std::endl;
+        //recv end
+
+
+        return ssl_sock;
+    }
+
+
+    void HttpClient::send_http_request() {
+
+        int buff_size = 0;
+        uint8_t *buff = nullptr;
+        int res = 0;
+        char *json_body = nullptr;
+
+        //resolve ip address from server_url/domain name
+        set_server(this->server_url.c_str());
         //create socket
-        int sock_fd = create_client_socket();
+        res = create_client_socket();
+
         //connect to server
         if (connect_server() < 0) throw "Connection failed";
         std::cout << "connected socket" << std::endl;
-        //Send request
-        send_request();
-        //async io
-        //struct pollfd poll_fd{0};
-        if (async_socket() < 0) throw "Fcntl failed :(";
+        if (this->port == 443) {
 
-        //recv request
-        int buff_size = BUFSIZ;
-        uint8_t *buff = (uint8_t *) realloc(nullptr, buff_size);
-        this->buffer_size = BUFSIZ;
-        this->response_buffer = buff;
+            buff_size = BUFSIZ;
+            buff = (uint8_t *) realloc(nullptr, buff_size);
+            this->buffer_size = BUFSIZ;
+            this->response_buffer = buff;
 
-        buff = recv_response();
+            create_tls();
+        } else {
 
+            //Send request
+            send_request();
+            if (async_socket() < 0) throw "Fcntl failed :(";
+
+            //recv request
+            buff_size = BUFSIZ;
+            buff = (uint8_t *) realloc(nullptr, buff_size);
+            this->buffer_size = BUFSIZ;
+            this->response_buffer = buff;
+
+            buff = recv_response();
+        }
 
         //parse json body
-        char *json_body = strstr((char *) buff, "\r\n\r\n");
-        json_body = strchr((char *) buff, '{');
-
+        //char *json_body = strstr((char *) buff, "\r\n\r\n");
+        //json_body = strchr((char *) buff, '{');
+        json_body = (char *) (buff);
         std::cout << json_body << std::endl;
 
     }
@@ -183,16 +283,20 @@ struct addrinfo *basic_http_client::resolve_ip(const char *domain_name) {
     return res;
 }
 
-void basic_http_client::show_ip(const char* domain_name) {
+void basic_http_client::show_ip(const char *domain_name) {
     const struct addrinfo *orig = resolve_ip(domain_name);
-    struct addrinfo* tmp = const_cast<addrinfo *>(orig);
+    struct addrinfo *tmp = const_cast<addrinfo *>(orig);
 
     while (tmp != nullptr) {
-        struct sockaddr_in *addr = (struct sockaddr_in*)tmp->ai_addr;
+        struct sockaddr_in *addr = (struct sockaddr_in *) tmp->ai_addr;
         struct in_addr ip = addr->sin_addr;
-        std::cout << inet_ntoa(ip) << " and AI_PROTOCOL " << tmp->ai_protocol << " AND socket type " << tmp->ai_socktype << std::endl;
+        std::string ip_addr_str = inet_ntoa(ip);
+        std::cout << ip_addr_str << " and AI_PROTOCOL " << tmp->ai_protocol << " AND socket type " << tmp->ai_socktype
+                  << std::endl;
         tmp = tmp->ai_next;
     }
+
+
 }
 
 
