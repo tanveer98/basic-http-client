@@ -15,10 +15,7 @@
 #define HTTP_PORT 80
 #define  API_IP "37.139.1.159"
 
-/***
- * create socket
- * @return sock_fd_ > 0 on success, -1 on failure
- */
+
 namespace basic_http_client {
 
     HttpClient::HttpClient() {
@@ -59,14 +56,12 @@ namespace basic_http_client {
         if (this->pollFd_ != nullptr) { free(this->pollFd_); }
     }
 
-/**
- * prepares an existing socket for async IO operation
- * @return 0 on success, -1 on failiure
- */
-
+    /**
+    * prepares an existing socket for async IO operation
+     * @return 0 on success, -1 on failiure
+    */
     int HttpClient::async_socket() {
         if (!this->isAsync_) { return 0; }
-        //should be cleaned up on dstor
         this->pollFd_ = static_cast<pollfd *>(calloc(1, sizeof(*pollFd_)));
         int status = fcntl(this->sockFd_, F_SETFL, fcntl(this->sockFd_, F_GETFL, 0) | O_NONBLOCK);
         if (status == -1) { return -1; }
@@ -93,10 +88,8 @@ namespace basic_http_client {
  * @param sock_fd
  * @return return 0 on success, -1 on failure
  */
-
     int HttpClient::connect_server() {
         int res = 0;
-
         auto conn = [&]() {
             return connect(this->sockFd_, (struct sockaddr *) this->serverAddr_, sizeof *serverAddr_);
         };
@@ -117,22 +110,24 @@ namespace basic_http_client {
         const char *header = this->request_.c_str();
         int to_be_sent = request_.size();
         int sent_bytes = 0;
+        //ALL HAIL LAMBDAS!
+        auto send_ = [&]() {
+            to_be_sent -= sent_bytes;
+            sent_bytes += send(this->sockFd_, header + sent_bytes, to_be_sent, 0);
+        };
+
 
         while (sent_bytes < to_be_sent) {
             if (this->isAsync_ && this->pollFd_) {
                 if (this->pollFd_->revents & POLLOUT) {
                     std::cout << this->pollFd_->revents << " so we can send data!" << std::endl;
-                    sent_bytes = send(this->sockFd_,this->responseBuffer_ + sent_bytes, to_be_sent,0);
-                    to_be_sent -= sent_bytes;
+                    send_();
                 }
             } else {
-                sent_bytes = send(this->sockFd_,this->responseBuffer_ + sent_bytes, to_be_sent,0);
-                to_be_sent -= sent_bytes;
+                send_();
             }
         }
         std::cout << "Sent bytes: " << sent_bytes << std::endl;
-
-
         return sent_bytes;
     }
 
@@ -146,29 +141,28 @@ namespace basic_http_client {
         uint8_t *buff = this->responseBuffer_;
         int buff_size = this->bufferSize_;
         int total = 0;
+        auto recv_ = [this, total, buff]() {
+            return recv(this->sockFd_, buff + total, BUFSIZ, 0);
+        };
 
         while (true) {
             int recv_bytes = 0;
-            if ((pollFd_ != nullptr)) {
+            if (this->isAsync_ && this->pollFd_) {
                 //non-blocking
-                int res = poll(pollFd_, 1, 0);
+                int res = poll(this->pollFd_, 1, 0);
                 //std::cout << res << std::endl;
 
-                if ((res > 0) && (pollFd_->revents & POLLIN)) {
-                    std::cout << pollFd_->revents << std::endl;
-                    recv_bytes = recv(sockFd_, buff + total, BUFSIZ, 0);
-                    this->end = std::chrono::steady_clock::now();
+                if ((res > 0) && (this->pollFd_->revents & POLLIN)) {
+                    std::cout << this->pollFd_->revents << std::endl;
+                    recv_bytes = recv_();
                     if (recv_bytes <= 0) { break; }
                 } else {
                     puts("Nothing to do...");
                 }
             } else {
                 //blocking
-                recv_bytes = recv(sockFd_, buff + total, BUFSIZ, 0);
+                recv_bytes = recv_();
                 this->end = std::chrono::steady_clock::now();
-                std::cout << "Time difference = "
-                          << std::chrono::duration_cast<std::chrono::milliseconds>(this->end - this->begin).count()
-                          << "[µs]" << std::endl;
                 if (recv_bytes <= 0) { break; }
             }
 
@@ -340,7 +334,7 @@ namespace basic_http_client {
 
         //parse json body
         json_body = (char *) (this->responseBuffer_);
-        std::cout << json_body <<std::endl;
+        //std::cout << json_body << std::endl;
         json_body = strstr(json_body, "\r\n\r\n");
         json_body = strchr(json_body, '{');
 
