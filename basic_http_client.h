@@ -10,6 +10,7 @@
 
 namespace basic_http_client
 {
+
     struct addrinfo *resolve_ip(const char *domain_name);
     void show_ip(const char* domain_name);
     class HttpClient;

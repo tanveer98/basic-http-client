@@ -10,7 +10,7 @@
 #include <netinet/in.h>
 #include <poll.h>
 #include <chrono>
-
+#include <tls.h>
 #include <string>
 
 //TODO:: implement cstor and dstor
@@ -20,26 +20,36 @@ namespace basic_http_client {
         int create_client_socket();
         int connect_server();
         int send_request();
+
         int async_socket();
         int create_ssl();
-
         uint8_t *recv_response();
+
         std::chrono::steady_clock::time_point begin;
         std::chrono::steady_clock::time_point end;
 
     public:
-        std::string server_url;
-        struct sockaddr_in* server_addr;
-        int port;
-        std::string request_header;
-        int sock_fd;
-        struct pollfd *poll_fd = nullptr;
-        uint8_t *response_buffer;
-        int buffer_size;
+
+        enum Protocol : int { HTTP = 80, HTTPS = 443 };
+
+        bool isAsync_ = false;
+        int port_{};
+        int bufferSize_{};
+        int sockFd_{};
+        uint8_t *responseBuffer_{};
+        std::string request_;
+        std::string serverUrl_;
+        struct sockaddr_in* serverAddr_ = nullptr;
+        struct pollfd *pollFd_ = nullptr;
+        struct tls* ctx_ = nullptr;
+
+        HttpClient();
+        HttpClient(const char *url, int port);
+        ~HttpClient();
+
         int create_tls();
         void set_server(const char*);
         void send_http_request();
-
 
     };
 
