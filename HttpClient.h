@@ -12,18 +12,18 @@
 #include <chrono>
 #include <tls.h>
 #include <string>
+#include <functional>
 
-//TODO:: implement cstor and dstor
 namespace basic_http_client {
     class HttpClient {
     private:
         int create_client_socket();
         int connect_server();
-        int send_request();
+        int send_request(const std::function<int(HttpClient*,int,int, const char*)>&);
 
         int async_socket();
         int create_ssl();
-        uint8_t *recv_response();
+        uint8_t *recv_response(const std::function<int(HttpClient*,uint8_t*,int)>&);
 
         std::chrono::steady_clock::time_point begin;
         std::chrono::steady_clock::time_point end;

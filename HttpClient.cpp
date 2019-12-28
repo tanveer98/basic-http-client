@@ -11,6 +11,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <tls.h>
+#include <functional>
 
 #define HTTP_PORT 80
 #define  API_IP "37.139.1.159"
@@ -67,8 +68,8 @@ namespace basic_http_client {
         if (status == -1) { return -1; }
 
         this->pollFd_->fd = sockFd_;
-        this->pollFd_->events = POLLIN | POLLOUT;
-        poll(this->pollFd_, 1, 10000);
+        this->pollFd_->events = (POLLIN | POLLOUT);
+        poll(this->pollFd_, 1, 0);
         return 0;
     }
 
@@ -105,29 +106,36 @@ namespace basic_http_client {
  * @return number of bytes sent on success
  */
 
-    int HttpClient::send_request() {
+    int HttpClient::send_request(const std::function<int(HttpClient *, int, int, const char *)> &send_) {
 
         const char *header = this->request_.c_str();
         int to_be_sent = request_.size();
         int sent_bytes = 0;
+        int res = 0;
         //ALL HAIL LAMBDAS!
-        auto send_ = [&]() {
-            to_be_sent -= sent_bytes;
-            sent_bytes += send(this->sockFd_, header + sent_bytes, to_be_sent, 0);
-        };
-
 
         while (sent_bytes < to_be_sent) {
             if (this->isAsync_ && this->pollFd_) {
-                if (this->pollFd_->revents & POLLOUT) {
-                    std::cout << this->pollFd_->revents << " so we can send data!" << std::endl;
-                    send_();
+                res = poll(this->pollFd_, 1, 0);
+                if ((res != 0) && ((this->pollFd_->revents & POLLOUT))) {
+                    std::cout << (this->pollFd_->revents & POLLOUT) << " so we can send data!" << std::endl;
+                    int sent = send_(this, to_be_sent, sent_bytes, header);
+                    // this if is necessary for TLS socket,
+                    // otherwise, sent_bytes is decremented by 2, which means we might send too much data
+                    // when the socket gets readable, better to just continue without touching anything.
+                    if (sent == TLS_WANT_POLLIN) { continue; }
+                    sent_bytes += sent;
+                    to_be_sent -= sent_bytes;
+                    std::cout << sent_bytes << " " << to_be_sent << std::endl;
                 }
             } else {
-                send_();
+                sent_bytes += send_(this, to_be_sent, sent_bytes, header);
+                to_be_sent -= sent_bytes;
             }
         }
-        std::cout << "Sent bytes: " << sent_bytes << std::endl;
+
+        std::cout << "Sent bytes: " << sent_bytes <<
+                  std::endl;
         return sent_bytes;
     }
 
@@ -137,13 +145,11 @@ namespace basic_http_client {
  * @return buffer
  */
 
-    uint8_t *HttpClient::recv_response() {
+    uint8_t *HttpClient::recv_response(const std::function<int(HttpClient *, uint8_t *, int)> &recv_) {
         uint8_t *buff = this->responseBuffer_;
         int buff_size = this->bufferSize_;
+        memset(buff, 0, buff_size);
         int total = 0;
-        auto recv_ = [this, total, buff]() {
-            return recv(this->sockFd_, buff + total, BUFSIZ, 0);
-        };
 
         while (true) {
             int recv_bytes = 0;
@@ -153,16 +159,16 @@ namespace basic_http_client {
                 //std::cout << res << std::endl;
 
                 if ((res > 0) && (this->pollFd_->revents & POLLIN)) {
-                    std::cout << this->pollFd_->revents << std::endl;
-                    recv_bytes = recv_();
+                    recv_bytes = recv_(this, buff, total);
+                    //Precaution, just in case the TLS socket is not readable
+                    if (recv_bytes == TLS_WANT_POLLOUT) { continue; }
                     if (recv_bytes <= 0) { break; }
                 } else {
                     puts("Nothing to do...");
                 }
             } else {
                 //blocking
-                recv_bytes = recv_();
-                this->end = std::chrono::steady_clock::now();
+                recv_bytes = recv_(this, buff, total);
                 if (recv_bytes <= 0) { break; }
             }
 
@@ -269,44 +275,40 @@ namespace basic_http_client {
 
 
     int HttpClient::create_tls() {
-        int res;
+        int res = 0;
+        int to_be_sent = request_.size();
+        int sent_bytes = 0;
+        int recv_bytes = 0;
+        int buff_size = 0;
+        int total = 0;
+        uint8_t *buff = this->responseBuffer_;
+        const char *header = this->request_.c_str();
+
+        auto send_ = [](HttpClient *this_, int to_be_sent, int sent_bytes, const char *header) {
+            return tls_write(this_->ctx_, header + sent_bytes, to_be_sent);
+        };
+
+        auto recv_ = [](HttpClient *this_, uint8_t *buff, int total) {
+            return tls_read(this_->ctx_, buff, BUFSIZ);
+        };
 
         res = tls_connect_socket(this->ctx_, this->sockFd_, "api.random.org");
         if (res < 0) {
             std::cout << "\n\n\n\nCreate tls failed, exiting" << std::endl;
             exit(102);
-        } else {
-            //send
-            const char *header = this->request_.c_str();
-            int to_be_sent = request_.size();
-            int sent_bytes = 0;
-            while (sent_bytes < to_be_sent) {
-                to_be_sent -= sent_bytes;
-                sent_bytes += tls_write(this->ctx_, header, to_be_sent);
-                if (sent_bytes <= 0) { exit(2); }
-            }
-            std::cout << "Sent bytes: " << sent_bytes << std::endl;
+        };
+        std::cout << typeid(send_).name() << std::endl;
+        //send
+        send_request(send_);
 
-            //recv
-            int recv_bytes = 0;
-            uint8_t *buff = this->responseBuffer_;
-            memset(buff, 0, this->bufferSize_);
-            int buff_size = this->bufferSize_;
-            int total = 0;
-
-
-            recv_bytes = tls_read(this->ctx_, buff, BUFSIZ);
-            //std::cout << (char *) buff << std::endl;
-
-        }
+        //recv
+        recv_response(recv_);
         return 0;
     }
 
     void HttpClient::send_http_request() {
         this->begin = std::chrono::steady_clock::now();
-
         char *json_body = nullptr;
-
         //resolve ip address from server_url/domain name
         set_server(this->serverUrl_.c_str());
         //create socket
@@ -315,26 +317,26 @@ namespace basic_http_client {
         if (connect_server() < 0) throw "Connection failed";
         std::cout << "connected socket" << std::endl;
         if (this->port_ == HTTPS) {
-/*
-            buff_size = BUFSIZ;
-            buff = (uint8_t *) realloc(nullptr, buff_size);
-            memset(buff, 0, buff_size);
-            this->bufferSize_ = BUFSIZ;
-            this->responseBuffer_ = buff;
-*/
             create_tls();
             //create_ssl();
         } else {
-
             //Send request
-            send_request();
+            auto send_ = [](HttpClient *this_, int to_be_sent, int sent_bytes, const char *header) {
+                return send(this_->sockFd_, header + sent_bytes, to_be_sent, 0);
+            };
+
+            send_request(send_);
             //recv request
-            recv_response();
+            auto recv_ = [](HttpClient *this_, uint8_t *total, int buff) {
+                return recv(this_->sockFd_, buff + total, BUFSIZ, 0);
+            };
+
+            recv_response(recv_);
         }
 
         //parse json body
         json_body = (char *) (this->responseBuffer_);
-        //std::cout << json_body << std::endl;
+        std::cout << json_body << std::endl;
         json_body = strstr(json_body, "\r\n\r\n");
         json_body = strchr(json_body, '{');
 
