@@ -5,14 +5,23 @@
 #ifndef BASIC_HTTP_CLIENT_BASIC_HTTP_CLIENT_H
 #define BASIC_HTTP_CLIENT_BASIC_HTTP_CLIENT_H
 
-#include "HttpClient.h"
 #include <netdb.h>
 
 namespace basic_http_client
 {
+    enum Protocol : int {
+        HTTP = 80, HTTPS = 443
+    };
+    enum REQ_METHOD : int {
+        GET, POST
+    };
 
     struct addrinfo *resolve_ip(const char *domain_name);
     void show_ip(const char* domain_name);
+
     class HttpClient;
+    class Cmdline;
+    class Request_Header;
 }
+
 #endif //BASIC_HTTP_CLIENT_BASIC_HTTP_CLIENT_H
