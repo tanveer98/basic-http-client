@@ -118,6 +118,7 @@ int basic_http_client::HttpClient::send_request(const std::function<int(HttpClie
             if ((res != 0) && ((this->pollFd_->revents & POLLOUT))) {
                 std::cout << (this->pollFd_->revents & POLLOUT) << " so we can send data!" << std::endl;
                 int sent = send_(this, to_be_sent, sent_bytes, header);
+                if (sent == -1) { exit(101);};
                 // this if is necessary for TLS socket,
                 // otherwise, sent_bytes is decremented by 2, which means we might send too much data
                 // when the socket gets readable, better to just continue without touching anything.
@@ -127,7 +128,10 @@ int basic_http_client::HttpClient::send_request(const std::function<int(HttpClie
                 std::cout << sent_bytes << " " << to_be_sent << std::endl;
             }
         } else {
-            sent_bytes += send_(this, to_be_sent, sent_bytes, header);
+            int sent = 0;
+            sent += send_(this, to_be_sent, sent_bytes, header);
+            if(sent <= 0) { break;};
+            sent_bytes += sent;
             to_be_sent -= sent_bytes;
         }
     }
@@ -292,7 +296,7 @@ int basic_http_client::HttpClient::create_tls() {
         return tls_read(this_->ctx_, buff, BUFSIZ);
     };
 
-    res = tls_connect_socket(this->ctx_, this->sockFd_, "api.random.org");
+    res = tls_connect_socket(this->ctx_, this->sockFd_, this->domain_name_.c_str());
     if (res < 0) {
         std::cout << "\n\n\n\nCreate tls failed, exiting" << std::endl;
         exit(102);
