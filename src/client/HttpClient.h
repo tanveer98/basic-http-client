@@ -18,18 +18,21 @@
 #include "request_header/Request_Header.h"
 
 class basic_http_client::HttpClient {
+    typedef int (*Recv_fn_ptr)(HttpClient *this_, uint8_t *buffer, int recvd);
+    typedef int (*Send_fn_ptr)(HttpClient *this_, int to_be_sent, int sent_bytes, const char *header);
 private:
     int create_client_socket();
 
     int connect_server();
 
-    int send_request(const std::function<int(HttpClient *, int, int, const char *)> &);
+    int send_request(Send_fn_ptr);
 
     int async_socket();
 
     int create_ssl();
 
-    uint8_t *recv_response(const std::function<int(HttpClient *, uint8_t *, int)> &);
+//    uint8_t *recv_response(const std::function<int(HttpClient *, uint8_t *, int)> &);
+    uint8_t *recv_response(Recv_fn_ptr);
 
     std::chrono::steady_clock::time_point begin;
     std::chrono::steady_clock::time_point end;
@@ -39,7 +42,7 @@ public:
     int port_{};
     int bufferSize_{};
     int sockFd_{};
-    uint8_t *responseBuffer_{};
+    uint8_t *responseBuffer_{nullptr};
     Request_Header *request_header;
     std::string domain_name_;
     struct sockaddr_in *serverAddr_ = nullptr;
