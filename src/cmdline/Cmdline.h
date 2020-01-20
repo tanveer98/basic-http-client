@@ -6,17 +6,19 @@
 #define BASIC_HTTP_CLIENT_CMDLINE_H
 
 #include "../../basic_http_client.h"
-class basic_http_client::Cmdline {
-public:
 
+class basic_http_client::Cmdline {
     const char *domain_name;
+
     const char *query;
     bool isAsync = false;
     basic_http_client::Protocol proto;
     basic_http_client::REQ_METHOD method;
-    HttpClient *client;
+    HttpClient *client{};
+public:
 
-    explicit Cmdline(const char *argv[]);
+    Cmdline() = default;
+    void send_http_request(int argc,const char *argv[]);
 };
 
 

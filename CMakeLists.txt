@@ -7,7 +7,7 @@ project(basic_http_client)
 
 #statically linked build script.
 #find library esentially find the directory of the lib.
-#on actual build it the ${value} is /path/to/lib
+#on actual build it the ${value} is /path/to/lib       
 find_library(LIB_TLS libtls.a /usr/local/lib/)
 find_library(LIB_SSL libssl.a /usr/local/lib/)
 find_library(LIB_CRYPTO libcrypto.a /usr/local/lib/)
