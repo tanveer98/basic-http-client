@@ -18,7 +18,7 @@ class basic_http_client::Cmdline {
 public:
 
     Cmdline() = default;
-    void send_http_request(int argc,const char *argv[]);
+    void send_http_request(int argc, char *argv[]);
 };
 
 

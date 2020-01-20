@@ -10,7 +10,7 @@
 #include "../client/request_header/Request_Header.h"
 #include "Cmdline.h"
 
-void basic_http_client::Cmdline::send_http_request(int argc,const char **argv) {
+void basic_http_client::Cmdline::send_http_request(int argc, char **argv) {
     using std::string;
     using std::endl;
     using std::cerr;
