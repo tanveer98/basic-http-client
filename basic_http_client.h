@@ -22,6 +22,7 @@ namespace basic_http_client
     class HttpClient;
     class Cmdline;
     class Request_Header;
+    class Interface_IO;
 }
 
 #endif //BASIC_HTTP_CLIENT_BASIC_HTTP_CLIENT_H

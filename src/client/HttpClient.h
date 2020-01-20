@@ -16,6 +16,7 @@
 #include <functional>
 #include "../../basic_http_client.h"
 #include "request_header/Request_Header.h"
+//#include "interface-io/Interface_IO.h"
 
 class basic_http_client::HttpClient {
     typedef int (*Recv_fn_ptr)(HttpClient *this_, uint8_t *buffer, int recvd);
@@ -25,14 +26,11 @@ private:
 
     int connect_server();
 
-    int send_request(Send_fn_ptr);
+    int send_request();
 
     int async_socket();
 
-    int create_ssl();
-
-//    uint8_t *recv_response(const std::function<int(HttpClient *, uint8_t *, int)> &);
-    uint8_t *recv_response(Recv_fn_ptr);
+    int recv_response();
 
     std::chrono::steady_clock::time_point begin;
     std::chrono::steady_clock::time_point end;
@@ -48,6 +46,7 @@ public:
     struct sockaddr_in *serverAddr_ = nullptr;
     struct pollfd *pollFd_ = nullptr;
     struct tls *ctx_ = nullptr;
+    Interface_IO* io_int;
 
     HttpClient();
 

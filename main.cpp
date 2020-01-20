@@ -14,53 +14,18 @@ int main(int argc, char *argv[]) {
         return 0;
     };
 
-    const char *arr1[] = {"http://api.openweathermap.org/data/2.5/weather?q=Tallinn&appid=940e55b3552b342bfa536b74c819a4cc", "GET", "async",};
-    const char *arr2[] = {"https://api.random.org/json-rpc/2/invoke" , "POST", "async", R"({"jsonrpc":"2.0","method":"generateStrings","params":{"apiKey":"00000000-0000-0000-0000-000000000000","n":10,"length":4,"characters":"abcdefghijklmnopqrstuvwxyz","replacement":true},"id":5337})"};
+    const char *arr1[] = {"http://api.openweathermap.org/data/2.5/weather?q=Tallinn&appid=940e55b3552b342bfa536b74c819a4cc", "GET", "nasync",};
+    const char *arr2[] = {"https://api.random.org/json-rpc/2/invoke" , "POST", "nasync", R"({"jsonrpc":"2.0","method":"generateStrings","params":{"apiKey":"00000000-0000-0000-0000-000000000000","n":10,"length":4,"characters":"abcdefghijklmnopqrstuvwxyz","replacement":true},"id":5337})"};
     const char *arr3[] = {"https://ics-calc-team7.tk/api/logs/response", "GET", "async"};
-    auto* cmd = new Cmdline(arr3);
+    auto* cmd = new Cmdline(arr2);
     try {
+        //implement method cmd_set client to make it change states between API's
        cmd->client->send_http_request();
-        basic_http_client::show_ip("ics-calc-team7.tk");
+        //basic_http_client::show_ip("ics-calc-team7.tk");
     }
     catch (const char *e) {
         std::cerr << e << std::endl;
     }
 
     return 0;
-
-
-/*
-     auto *openWeatherMap  = new HttpClient();
-    //openWeatherMap.request_header = "GET /data/2.5/weather?q=Tallinn&appid=940e55b3552b342bfa536b74c819a4cc HTTP/1.1\r\nHost: api.openweathermap.org\r\nUser-Agent: Mozilla/4.0 (compatible; MSIE5.01; Windows NT)\r\nAccept-Encoding: deflate\r\nConnection: close\r\n\r\n";
-    openWeatherMap->domain_name_ = argv[1];
-    openWeatherMap->isAsync_ = true;
-    openWeatherMap->port_ = basic_http_client::Protocol::HTTP;
-
-    HttpClient random_org("api.random.org", HttpClient::Protocol::HTTPS);
-    struct pollfd _poll = {0};
-    struct sockaddr_in s_addr_in;
-    boost::format request_header;
-    std::string request_body;
-    std::string request;
-    int req_body_len = 0;
-
-    request_body = R"({"jsonrpc":"2.0","method":"getUsage","params":{"apiKey":"00000000-0000-0000-0000-000000000000"},"id":14437})";
-    req_body_len = request_body.size();
-    //POST request must contain a content-length (size of the payload)
-    request_header = boost::format(
-            "POST /json-rpc/2/invoke HTTP/1.1\r\nHost: %s\r\nUser-Agent: Mozilla/4.0 (compatible; MSIE5.01; Windows NT)\r\nContent-Length: %d\r\nAccept-Encoding: deflate\r\nConnection: Close\r\nContent-Type: application/json\r\n\r\n%s") %
-                                  argv[1] % req_body_len % request_body;
-
-    request = request_header.str();
-    std::cout << "\t*******request: " << request << " and size : " << request_body.size() << " ********" << std::endl;
-    random_org.isAsync_ = false;
-    random_org.request_ = request;
-    try {
-        random_org.send_http_request();
-        basic_http_client::show_ip(argv[1]);
-    }
-    catch (const char *e) {
-        std::cerr << e << std::endl;
-    }*/
-
 }
