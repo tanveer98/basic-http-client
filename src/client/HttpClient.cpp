@@ -7,11 +7,9 @@
 #include <cstring>
 #include <netdb.h>
 #include "HttpClient.h"
-#include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <tls.h>
-#include <functional>
-#include "interface-io/Interface_IO.h"
+#include "interface-io/IO_Functions.h"
 
 #define HTTP_PORT 80
 #define  API_IP "37.139.1.159"
@@ -106,7 +104,7 @@ int basic_http_client::HttpClient::connect_server() {
  */
 
 int basic_http_client::HttpClient::send_request() {
-    int sent_bytes = this->io_int->Send(this);
+    int sent_bytes = IO_Functions::Send(this);
     std::cout << "Sent bytes: " << sent_bytes <<
               std::endl;
     return sent_bytes;
@@ -119,7 +117,7 @@ int basic_http_client::HttpClient::send_request() {
  */
 
 int basic_http_client::HttpClient::recv_response() {
-    int recvd_bytes = this->io_int->Recv(this);
+    int recvd_bytes = IO_Functions::Recv(this);
     std::cout << "Recieved bytes: " << recvd_bytes <<
               std::endl;
     return recvd_bytes;

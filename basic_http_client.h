@@ -5,8 +5,6 @@
 #ifndef BASIC_HTTP_CLIENT_BASIC_HTTP_CLIENT_H
 #define BASIC_HTTP_CLIENT_BASIC_HTTP_CLIENT_H
 
-#include <netdb.h>
-
 namespace basic_http_client
 {
     enum Protocol : int {
@@ -22,7 +20,7 @@ namespace basic_http_client
     class HttpClient;
     class Cmdline;
     class Request_Header;
-    class Interface_IO;
+    //class IO_Functions;
 }
 
 #endif //BASIC_HTTP_CLIENT_BASIC_HTTP_CLIENT_H
